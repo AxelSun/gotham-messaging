@@ -1,80 +1,85 @@
+import type { InferSelectModel } from "drizzle-orm";
 import { relations, sql } from "drizzle-orm";
-import { pgTable, primaryKey } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
+import {
+  check,
+  integer,
+  pgTable,
+  serial,
+  text,
+  timestamp,
+  unique,
+  varchar,
+} from "drizzle-orm/pg-core";
 
-export const Post = pgTable("post", (t) => ({
-  id: t.uuid().notNull().primaryKey().defaultRandom(),
-  title: t.varchar({ length: 256 }).notNull(),
-  content: t.text().notNull(),
-  createdAt: t.timestamp().defaultNow().notNull(),
-  updatedAt: t
-    .timestamp({ mode: "date", withTimezone: true })
-    .$onUpdateFn(() => sql`now()`),
-}));
-
-export const CreatePostSchema = createInsertSchema(Post, {
-  title: z.string().max(256),
-  content: z.string().max(256),
-}).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: varchar({ length: 50 }).notNull().unique(),
+  password: varchar({ length: 255 }).notNull(),
+  createdAt: timestamp().defaultNow().notNull(),
 });
 
-export const User = pgTable("user", (t) => ({
-  id: t.uuid().notNull().primaryKey().defaultRandom(),
-  name: t.varchar({ length: 255 }),
-  email: t.varchar({ length: 255 }).notNull(),
-  emailVerified: t.timestamp({ mode: "date", withTimezone: true }),
-  image: t.varchar({ length: 255 }),
-}));
-
-export const UserRelations = relations(User, ({ many }) => ({
-  accounts: many(Account),
-}));
-
-export const Account = pgTable(
-  "account",
-  (t) => ({
-    userId: t
-      .uuid()
+export const threads = pgTable(
+  "threads",
+  {
+    id: serial("id").primaryKey(),
+    user1Id: integer("user1_id")
       .notNull()
-      .references(() => User.id, { onDelete: "cascade" }),
-    type: t
-      .varchar({ length: 255 })
-      .$type<"email" | "oauth" | "oidc" | "webauthn">()
-      .notNull(),
-    provider: t.varchar({ length: 255 }).notNull(),
-    providerAccountId: t.varchar({ length: 255 }).notNull(),
-    refresh_token: t.varchar({ length: 255 }),
-    access_token: t.text(),
-    expires_at: t.integer(),
-    token_type: t.varchar({ length: 255 }),
-    scope: t.varchar({ length: 255 }),
-    id_token: t.text(),
-    session_state: t.varchar({ length: 255 }),
-  }),
-  (account) => ({
-    compoundKey: primaryKey({
-      columns: [account.provider, account.providerAccountId],
-    }),
-  }),
+      .references(() => users.id),
+    user2Id: integer("user2_id")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => {
+    return {
+      uniqueUsers: unique("unique_users").on(table.user1Id, table.user2Id),
+      checkUserOrder: check(
+        "user_order",
+        sql`${table.user1Id} < ${table.user2Id}`,
+      ),
+    };
+  },
 );
 
-export const AccountRelations = relations(Account, ({ one }) => ({
-  user: one(User, { fields: [Account.userId], references: [User.id] }),
-}));
-
-export const Session = pgTable("session", (t) => ({
-  sessionToken: t.varchar({ length: 255 }).notNull().primaryKey(),
-  userId: t
-    .uuid()
+export const messages = pgTable("messages", {
+  id: serial("id").primaryKey(),
+  threadId: integer()
     .notNull()
-    .references(() => User.id, { onDelete: "cascade" }),
-  expires: t.timestamp({ mode: "date", withTimezone: true }).notNull(),
+    .references(() => threads.id, { onDelete: "cascade" }),
+  senderId: integer()
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  content: text().notNull(),
+  timestamp: timestamp().defaultNow().notNull(),
+});
+
+export type Message = InferSelectModel<typeof messages>;
+
+export const usersRelations = relations(users, ({ many }) => ({
+  messages: many(messages),
+  threadsAsUser1: many(threads),
+  threadsAsUser2: many(threads),
 }));
 
-export const SessionRelations = relations(Session, ({ one }) => ({
-  user: one(User, { fields: [Session.userId], references: [User.id] }),
+export const threadsRelations = relations(threads, ({ one, many }) => ({
+  user1: one(users, {
+    fields: [threads.user1Id],
+    references: [users.id],
+  }),
+  user2: one(users, {
+    fields: [threads.user2Id],
+    references: [users.id],
+  }),
+  messages: many(messages),
+}));
+
+export const messagesRelations = relations(messages, ({ one }) => ({
+  sender: one(users, {
+    fields: [messages.senderId],
+    references: [users.id],
+  }),
+  thread: one(threads, {
+    fields: [messages.threadId],
+    references: [threads.id],
+  }),
 }));

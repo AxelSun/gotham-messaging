@@ -4,6 +4,13 @@ export default {
   darkMode: ["class"],
   content: ["src/**/*.{ts,tsx}"],
   theme: {
+    container: {
+      center: true,
+      padding: "2rem",
+      screens: {
+        "2xl": "1400px",
+      },
+    },
     extend: {
       colors: {
         border: "hsl(var(--border))",
@@ -12,8 +19,13 @@ export default {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+          DEFAULT: "#0084FF",
+          hover: "#0073E6",
+          light: "#E6F2FF",
+        },
+        chat: {
+          sent: "#E3F2FD",
+          received: "#F5F5F5",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -40,8 +52,17 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
       },
-      borderColor: {
-        DEFAULT: "hsl(var(--border))",
+      fontFamily: {
+        sans: ["Inter", "sans-serif"],
+      },
+      keyframes: {
+        "message-appear": {
+          "0%": { transform: "translateY(20px)", opacity: "0" },
+          "100%": { transform: "translateY(0)", opacity: "1" },
+        },
+      },
+      animation: {
+        "message-in": "message-appear 0.3s ease-out forwards",
       },
     },
   },
